@@ -1,4 +1,8 @@
+import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.IMap;
+import com.hazelcast.map.listener.EntryAddedListener;
+import com.hazelcast.map.listener.EntryUpdatedListener;
+import com.hazelcast.map.listener.MapListener;
 import io.distmap.DistributedMap;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -13,15 +17,18 @@ public class SimpleCommunicationTest {
 
     private static final String TEST_MAP = "TEST_MAP";
     private static IMap<String, String> map;
+    private static final String DEFAULT_PARTITION = "aaa";
+
+    private String result;
 
     @BeforeClass
     public static void before() throws InterruptedException {
+        map = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).build();
         Thread.sleep(1000);
     }
 
     @Test
     public void testSendReceive() throws InterruptedException {
-        map = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition("aaa").build();
         System.out.println("Putting at time " + System.currentTimeMillis());
         map.put("test", "dfs");
         IMap<String, String> map2 = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition("bbb").build();
@@ -37,6 +44,29 @@ public class SimpleCommunicationTest {
         res = map.get("test");
         Assert.assertNotNull(res);
         Assert.assertEquals(res,"dfs");
+
+    }
+
+    @Test
+    public void testListener() throws InterruptedException {
+        String key = "test";
+        String oldValue = "dfs";
+        map.put(key, oldValue);
+        IMap<String, String> mapWithListener = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new EntryUpdatedListener<String, String>() {
+
+            public void entryUpdated(EntryEvent<String, String> event) {
+                result = event.getValue();
+            }
+        }).build();
+
+        Assert.assertEquals(oldValue,map.get(key));
+        Assert.assertNull(result);
+        String newData = "abcde";
+        map.put(key, newData);
+
+        Thread.sleep(1000);
+        Assert.assertNotNull(result);
+        Assert.assertEquals(newData,result);
 
     }
 
