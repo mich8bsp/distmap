@@ -5,7 +5,7 @@ import com.hazelcast.map.listener.EntryAddedListener;
 import com.hazelcast.map.listener.EntryRemovedListener;
 import com.hazelcast.map.listener.EntryUpdatedListener;
 
-/**
+/** Callback interface providing default empty implementations which should be overridden
  * Created by mich8bsp on 28-Jan-16.
  */
 public class MapCallback<K, V> implements EntryAddedListener<K,V>, EntryUpdatedListener<K,V>, EntryRemovedListener<K,V> {

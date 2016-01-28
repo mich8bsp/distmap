@@ -1,18 +1,12 @@
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.IMap;
-import com.hazelcast.map.listener.EntryAddedListener;
-import com.hazelcast.map.listener.EntryUpdatedListener;
-import com.hazelcast.map.listener.MapListener;
 import io.distmap.DistributedMap;
 import io.distmap.MapCallback;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
-import java.util.Map;
-
-/**
+/** Test for simple communication using synchronous and asynchronous messaging
  * Created by mich8bsp on 15-Jan-16.
  */
 public class SimpleCommunicationTest {
@@ -45,7 +39,7 @@ public class SimpleCommunicationTest {
 
         res = map.get("test");
         Assert.assertNotNull(res);
-        Assert.assertEquals(res,"dfs");
+        Assert.assertEquals(res, "dfs");
 
     }
 
@@ -54,7 +48,7 @@ public class SimpleCommunicationTest {
         String key = "test";
         String oldValue = "dfs";
         map.put(key, oldValue);
-        IMap<String, String> mapWithListener = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
+        new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
 
             @Override
             public void entryUpdated(EntryEvent<String, String> event) {
@@ -62,14 +56,14 @@ public class SimpleCommunicationTest {
             }
         }).build();
 
-        Assert.assertEquals(oldValue,map.get(key));
+        Assert.assertEquals(oldValue, map.get(key));
         Assert.assertNull(result);
         String newData = "abcde";
         map.put(key, newData);
 
         Thread.sleep(1000);
         Assert.assertNotNull(result);
-        Assert.assertEquals(newData,result);
+        Assert.assertEquals(newData, result);
 
     }
 
