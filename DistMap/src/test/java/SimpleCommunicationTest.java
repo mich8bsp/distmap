@@ -6,7 +6,8 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-/** Test for simple communication using synchronous and asynchronous messaging
+/**
+ * Test for simple communication using synchronous and asynchronous messaging
  * Created by mich8bsp on 15-Jan-16.
  */
 public class SimpleCommunicationTest {
@@ -64,6 +65,34 @@ public class SimpleCommunicationTest {
         Thread.sleep(1000);
         Assert.assertNotNull(result);
         Assert.assertEquals(newData, result);
+
+    }
+
+    @Test
+    public void testListenerFilter() throws InterruptedException {
+        String key = "test";
+        String oldValue = "dfs";
+        map.put(key, oldValue);
+        new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
+
+            @Override
+            public void entryUpdated(EntryEvent<String, String> event) {
+                result = event.getValue();
+            }
+        }, (p -> p.getValue().contains("a"))).build();
+
+        Assert.assertEquals(oldValue, map.get(key));
+        Assert.assertNull(result);
+        String newData = "abcde";
+        map.put(key, newData);
+
+        Thread.sleep(1000);
+        Assert.assertNotNull(result);
+        Assert.assertEquals(newData, result);
+        Thread.sleep(1000);
+        map.put(key, "shhhjhd");
+        //was filtered
+        Assert.assertEquals(newData,result);
 
     }
 
