@@ -1,8 +1,9 @@
-import io.distmap.EMapPermissions;
-import io.distmap.NetAPI;
+import com.hazelcast.core.IMap;
+import io.distmap.DistributedMap;
+import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.util.Calendar;
 import java.util.Map;
 
 /**
@@ -10,25 +11,34 @@ import java.util.Map;
  */
 public class SimpleCommunicationTest {
 
-    @Test
-    public void testSend() throws InterruptedException {
-        NetAPI netAPI = new NetAPI(3, "oper");
-        Map<String, Calendar> map = netAPI.getDistributedMap("TEST-MAP", EMapPermissions.READ_WRITE);
-        Calendar cal = Calendar.getInstance();
-        cal.set(1991, Calendar.FEBRUARY, 20);
-        map.put("test", cal);
+    private static final String TEST_MAP = "TEST_MAP";
+    private static IMap<String, String> map;
 
-        Thread.sleep(100000);
+    @BeforeClass
+    public static void before() throws InterruptedException {
+        Thread.sleep(1000);
     }
 
     @Test
-    public void testReceive() throws InterruptedException {
-        NetAPI netAPI = new NetAPI(3, "oper");
-        Map<String, Calendar> map = netAPI.getDistributedMap("TEST-MAP", EMapPermissions.READ_WRITE);
-        while (true) {
-            map.get("test");
+    public void testSendReceive() throws InterruptedException {
+        map = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition("aaa").build();
+        System.out.println("Putting at time " + System.currentTimeMillis());
+        map.put("test", "dfs");
+        IMap<String, String> map2 = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition("bbb").build();
+        Thread.sleep(5000);
+        System.out.println("Putting at time " + System.currentTimeMillis());
+        map.put("test", "dfs");
 
-            Thread.sleep(1000);
-        }
+        String res = map2.get("test");
+
+        Assert.assertNull(res);
+        Thread.sleep(500);
+
+        res = map.get("test");
+        Assert.assertNotNull(res);
+        Assert.assertEquals(res,"dfs");
+
     }
+
+
 }
