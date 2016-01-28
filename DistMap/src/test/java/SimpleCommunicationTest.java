@@ -24,24 +24,25 @@ public class SimpleCommunicationTest {
 
     @BeforeClass
     public static void before() throws InterruptedException {
-        map = new DistributedMap.MapBuilder<String, String>(TEST_MAP,domain1).setPartition(DEFAULT_PARTITION).build();
+        map = buildMap(domain1, DEFAULT_PARTITION);
         Thread.sleep(1000);
+    }
+
+    private static IMap<String, String> buildMap(int domain, String partition) {
+        return new DistributedMap<String, String>().new MapBuilder(TEST_MAP, domain).setPartition(partition).build();
     }
 
     @Test
     public void testSendReceive() throws InterruptedException {
         System.out.println("Putting at time " + System.currentTimeMillis());
         map.put("test", "dfs");
-        IMap<String, String> map2 = new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition("bbb").build();
-        Thread.sleep(5000);
+        IMap<String, String> map2 = buildMap(domain1, "bbb");
+        Thread.sleep(500);
         System.out.println("Putting at time " + System.currentTimeMillis());
         map.put("test", "dfs");
 
         String res = map2.get("test");
-
         Assert.assertNull(res);
-        Thread.sleep(500);
-
         res = map.get("test");
         Assert.assertNotNull(res);
         Assert.assertEquals(res, "dfs");
@@ -53,7 +54,7 @@ public class SimpleCommunicationTest {
         String key = "test";
         String oldValue = "dfs";
         map.put(key, oldValue);
-        new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
+        new DistributedMap<String, String>().new MapBuilder(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
 
             @Override
             public void entryUpdated(EntryEvent<String, String> event) {
@@ -66,7 +67,7 @@ public class SimpleCommunicationTest {
         String newData = "abcde";
         map.put(key, newData);
 
-        Thread.sleep(1000);
+        Thread.sleep(500);
         Assert.assertNotNull(result);
         Assert.assertEquals(newData, result);
 
@@ -77,7 +78,7 @@ public class SimpleCommunicationTest {
         String key = "test";
         String oldValue = "dfs";
         map.put(key, oldValue);
-        new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
+        new DistributedMap<String, String>().new MapBuilder(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
 
             @Override
             public void entryUpdated(EntryEvent<String, String> event) {
@@ -90,21 +91,21 @@ public class SimpleCommunicationTest {
         String newData = "abcde";
         map.put(key, newData);
 
-        Thread.sleep(1000);
+        Thread.sleep(500);
         Assert.assertNotNull(result);
         Assert.assertEquals(newData, result);
-        Thread.sleep(1000);
         map.put(key, "shhhjhd");
+        Thread.sleep(500);
         //was filtered
-        Assert.assertEquals(newData,result);
+        Assert.assertEquals(newData, result);
 
     }
 
     @Test
-    public void testDomainSeparation(){
+    public void testDomainSeparation() {
         int domain2 = 2;
-        Map<String, String> map2 = new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain2).setPartition(DEFAULT_PARTITION).build();
-        Map<String, String> map3 = new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).build();
+        Map<String, String> map2 = buildMap(domain2, DEFAULT_PARTITION);
+        Map<String, String> map3 = buildMap(domain1, DEFAULT_PARTITION);
         String key = "key";
         String value = "dsfd";
         map.put(key, value);
@@ -114,11 +115,6 @@ public class SimpleCommunicationTest {
 
         Assert.assertNull(resFromAnotherDomain);
         Assert.assertEquals(value, resFromSameDomain);
-
-
-
-
-
     }
 
 //    @Test
