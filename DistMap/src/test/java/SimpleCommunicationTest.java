@@ -4,8 +4,10 @@ import com.hazelcast.map.listener.EntryAddedListener;
 import com.hazelcast.map.listener.EntryUpdatedListener;
 import com.hazelcast.map.listener.MapListener;
 import io.distmap.DistributedMap;
+import io.distmap.MapCallback;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Map;
@@ -52,8 +54,9 @@ public class SimpleCommunicationTest {
         String key = "test";
         String oldValue = "dfs";
         map.put(key, oldValue);
-        IMap<String, String> mapWithListener = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new EntryUpdatedListener<String, String>() {
+        IMap<String, String> mapWithListener = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
 
+            @Override
             public void entryUpdated(EntryEvent<String, String> event) {
                 result = event.getValue();
             }
@@ -69,6 +72,29 @@ public class SimpleCommunicationTest {
         Assert.assertEquals(newData,result);
 
     }
+
+//    @Test
+//    public void manualTest() throws InterruptedException {
+//        int count = 1;
+//        while(true){
+//            map.put("dsfs", "dfsa" + count++);
+//            Thread.sleep(1000);
+//        }
+//    }
+//
+//
+//    @Test
+//    public void manualTest2() throws InterruptedException {
+//        IMap<String, String> mapWithListener = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new EntryUpdatedListener<String, String>() {
+//
+//            public void entryUpdated(EntryEvent<String, String> event) {
+//                System.out.println("got result " + event.getValue());
+//            }
+//        }).build();
+//        while(true){
+//            Thread.sleep(1000);
+//        }
+//    }
 
 
 }

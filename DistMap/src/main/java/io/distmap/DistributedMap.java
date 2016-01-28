@@ -5,6 +5,7 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.map.listener.MapListener;
+import com.hazelcast.query.Predicate;
 
 import java.util.Map;
 
@@ -13,12 +14,13 @@ import java.util.Map;
  */
 public class DistributedMap {
 
-    public static class MapBuilder<K,V> {
+    public static class MapBuilder<K, V> {
 
         private String mapName;
-        private MapListener listener;
+        private MapListener callback;
         private String partition;
         private HazelcastInstance hazelcast;
+        private Predicate<K, V> callbackFilter;
 
         public MapBuilder(String mapName) {
             this.mapName = mapName;
@@ -29,12 +31,18 @@ public class DistributedMap {
             return this;
         }
 
-        public MapBuilder<K, V> setListener(MapListener listener) {
-            this.listener = listener;
+        public MapBuilder<K, V> setListener(MapCallback callback) {
+            this.callback = callback;
             return this;
         }
 
-        public MapBuilder<K,V> setPartition(String partition) {
+        public MapBuilder<K, V> setListener(MapCallback callback, Predicate<K, V> filter) {
+            this.callback = callback;
+            this.callbackFilter = filter;
+            return this;
+        }
+
+        public MapBuilder<K, V> setPartition(String partition) {
             this.partition = partition;
             return this;
         }
@@ -45,8 +53,12 @@ public class DistributedMap {
                 this.hazelcast = Hazelcast.newHazelcastInstance(config);
             }
             IMap<K, V> map = hazelcast.getMap(mapName);
-            if (listener != null) {
-                map.addEntryListener(listener, true);
+            if (callback != null) {
+                if (callbackFilter == null) {
+                    map.addEntryListener(callback, true);
+                } else {
+                    map.addEntryListener(callback, callbackFilter, true);
+                }
             }
             return map;
         }
