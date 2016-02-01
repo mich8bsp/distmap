@@ -6,11 +6,13 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.query.Predicate;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Main builder for distributed map. should be used in the following way:
- * new DistributedMap.MapBuilder<K, V>(%MAP_NAME%).build();
+ * new DistributedMap<K, V>().MapBuilder(%MAP_NAME%).build();
  * Created by mich8bsp on 14-Jan-16.
  */
 public class DistributedMap<K, V> {
@@ -32,10 +34,10 @@ public class DistributedMap<K, V> {
 
         private String mapName;
         private MapCallback<K, V> callback;
-        private String partition;
-        //        private HazelcastInstance hazelcast;
+        private String partition = "*";
         private Predicate<K, V> callbackFilter;
-        private int domain;
+        private int domain = 0;
+        private List<String> hosts;
 
         public MapBuilder(String mapName, int domain) {
             if(initialized.get()){
@@ -55,6 +57,11 @@ public class DistributedMap<K, V> {
             return this;
         }
 
+        public MapBuilder setHosts(String... hosts){
+            this.hosts = Arrays.asList(hosts);
+            return this;
+        }
+
         public MapBuilder setListener(MapCallback<K, V> callback, Predicate<K, V> filter) {
             this.callback = callback;
             this.callbackFilter = filter;
@@ -68,7 +75,7 @@ public class DistributedMap<K, V> {
 
         public IMap<K, V> build() {
             if (hazelcast == null) {
-                Config config = ConfigManagement.initializeConfig(domain, partition);
+                Config config = ConfigManagement.<K, V>initializeConfig(this);
                 hazelcast = Hazelcast.newHazelcastInstance(config);
             }
             IMap<K, V> map = hazelcast.getMap(mapName);
@@ -81,6 +88,30 @@ public class DistributedMap<K, V> {
             }
             innerMap = map;
             return map;
+        }
+
+        public String getMapName() {
+            return mapName;
+        }
+
+        public MapCallback<K, V> getCallback() {
+            return callback;
+        }
+
+        public String getPartition() {
+            return partition;
+        }
+
+        public Predicate<K, V> getCallbackFilter() {
+            return callbackFilter;
+        }
+
+        public int getDomain() {
+            return domain;
+        }
+
+        public List<String> getHosts() {
+            return hosts;
         }
     }
 
