@@ -10,11 +10,16 @@ import com.hazelcast.config.MulticastConfig;
  */
 public class ConfigManagement {
 
-    protected static Config initializeConfig(int domain, String partition) {
+    public static Config initializeConfig(int domain, String partition) {
         Config config = new Config();
         config.getGroupConfig().setName(partition);
         int multicastPort = getMulticastPortFromDomain(domain);
         config.getNetworkConfig().getJoin().getMulticastConfig().setMulticastPort(multicastPort);
+        return config;
+    }
+
+    public static Config addPersistence(Config config){
+        //FIXME: add persistence config
         return config;
     }
 

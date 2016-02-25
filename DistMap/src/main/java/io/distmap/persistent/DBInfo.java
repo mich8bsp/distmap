@@ -1,6 +1,5 @@
-package io.distmap;
+package io.distmap.persistent;
 
-import java.util.Arrays;
 import java.util.List;
 
 /**

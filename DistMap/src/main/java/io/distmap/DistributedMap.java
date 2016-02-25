@@ -47,9 +47,13 @@ public class DistributedMap {
             return this;
         }
 
+        public Config getConfig(){
+            return ConfigManagement.initializeConfig(domain, partition);
+        }
+
         public IMap<K, V> build() {
             if (hazelcast == null) {
-                Config config = ConfigManagement.initializeConfig(domain, partition);
+                Config config = getConfig();
                 this.hazelcast = Hazelcast.newHazelcastInstance(config);
             }
             IMap<K, V> map = hazelcast.getMap(mapName);
@@ -62,7 +66,5 @@ public class DistributedMap {
             }
             return map;
         }
-
-
     }
 }
