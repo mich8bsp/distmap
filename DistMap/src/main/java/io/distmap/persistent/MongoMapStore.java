@@ -1,15 +1,13 @@
 package io.distmap.persistent;
 
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.MapLoaderLifecycleSupport;
 import com.hazelcast.core.MapStore;
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.Logger;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 import org.mongodb.morphia.AdvancedDatastore;
-import org.mongodb.morphia.Datastore;
 import org.mongodb.morphia.Morphia;
-import org.mongodb.morphia.query.Query;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,11 +15,26 @@ import java.util.stream.Collectors;
 /**
  * Created by אלכס on 25/02/2016.
  */
-public abstract class MongoMapStore<K, V> implements MapStore<K, V> {
+public abstract class MongoMapStore<K, V> implements MapStore<K, V>, MapLoaderLifecycleSupport {
 
-    private static final ILogger logger = Logger.getLogger(MongoMapStore.class);
     public static final int DEFAULT_MONGO_PORT = 27017;
     private AdvancedDatastore datastore;
+    private String collectionName;
+    private MongoClient client;
+
+
+    @Override
+    public void init(HazelcastInstance hazelcastInstance, Properties properties, String mapName) {
+        this.collectionName = mapName;
+        DBInfo dbInfo = DBInfo.getDBInfo(properties);
+        connectToDB(dbInfo);
+    }
+
+
+    @Override
+    public void destroy() {
+        client.close();
+    }
 
 
     public abstract Class<V> getStoredValueClass();
@@ -33,7 +46,7 @@ public abstract class MongoMapStore<K, V> implements MapStore<K, V> {
     }
 
     public void connectToDB(DBInfo dbInfo) {
-        MongoClient client = createClient(dbInfo);
+        client = createClient(dbInfo);
         Morphia morphia = new Morphia();
         mapEntities(morphia);
         datastore = (AdvancedDatastore) morphia.createDatastore(client, dbInfo.getDbName());

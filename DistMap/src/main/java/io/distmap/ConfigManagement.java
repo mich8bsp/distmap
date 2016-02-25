@@ -1,8 +1,10 @@
 package io.distmap;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.config.MapConfig;
+import com.hazelcast.config.MapStoreConfig;
 import com.hazelcast.config.MulticastConfig;
+import com.hazelcast.core.MapStore;
+import io.distmap.persistent.DBInfo;
 
 /**
  * Config management for network properties
@@ -18,8 +20,12 @@ public class ConfigManagement {
         return config;
     }
 
-    public static Config addPersistence(Config config){
-        //FIXME: add persistence config
+    public static Config addPersistence(Config config, String mapName, MapStore mapStore, MapStoreConfig.InitialLoadMode loadMode, DBInfo dbInfo) {
+        MapStoreConfig mapStoreConfig = config.getMapConfig(mapName).getMapStoreConfig();
+        mapStoreConfig.setClassName(mapStore.getClass().getName());
+        mapStoreConfig.setImplementation(mapStore);
+        mapStoreConfig.setInitialLoadMode(loadMode);
+        mapStoreConfig.setProperties(DBInfo.getProperties(dbInfo));
         return config;
     }
 

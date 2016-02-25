@@ -1,6 +1,9 @@
 package io.distmap.persistent;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Created by אלכס on 25/02/2016.
@@ -10,6 +13,27 @@ public class DBInfo {
     private List<String> dbHosts;
     private String userName;
     private String password;
+
+
+    public static DBInfo getDBInfo(Properties properties){
+        String userName = properties.getProperty("userName");
+        String password = properties.getProperty("password");
+        String dbName = properties.getProperty("dbName");
+        String dbHosts = properties.getProperty("dbHosts");
+        List<String> dbHostsList = Arrays.asList(dbHosts.split (","));
+        return new DBInfo(dbName, dbHostsList,userName,password);
+    }
+
+    public static Properties getProperties(DBInfo dbInfo){
+        Properties properties = new Properties();
+        properties.setProperty("userName", dbInfo.getUserName());
+        properties.setProperty("password", dbInfo.getPassword());
+        properties.setProperty("dbName", dbInfo.getDbName());
+        String hosts = dbInfo.getDbHosts().stream().reduce("", (x, y)-> x +","+ y);
+        hosts = hosts.substring(1);
+        properties.setProperty("dbHosts", hosts);
+        return properties;
+    }
 
     @Override
     public boolean equals(Object o) {
