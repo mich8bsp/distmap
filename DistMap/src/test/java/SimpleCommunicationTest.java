@@ -19,6 +19,7 @@ public class SimpleCommunicationTest {
     private static final String DEFAULT_PARTITION = "aaa";
 
     private String result;
+    private TestType typeResult;
 
     private static int domain1 = 0;
 
@@ -114,10 +115,24 @@ public class SimpleCommunicationTest {
 
         Assert.assertNull(resFromAnotherDomain);
         Assert.assertEquals(value, resFromSameDomain);
+    }
 
+    @Test
+    public void testType() throws InterruptedException {
+        int domain = 34;
+        Map<TestType, TestType> map1 = new DistributedMap.MapBuilder<TestType, TestType>(TEST_MAP, domain).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map2 = new DistributedMap.MapBuilder<TestType, TestType>(TEST_MAP, domain).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<TestType, TestType>(){
+            @Override
+            public void entryAdded(EntryEvent<TestType, TestType> event) {
+                typeResult = event.getValue();
+            }
+        }).build();
+        TestType item = new TestType();
+        map1.put(item, item);
 
-
-
+        Thread.sleep(5000);
+        Assert.assertNotNull(typeResult);
+        Assert.assertEquals(item, typeResult);
 
     }
 
