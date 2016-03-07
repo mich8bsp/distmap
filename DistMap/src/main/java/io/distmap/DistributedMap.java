@@ -14,12 +14,12 @@ public class DistributedMap {
 
     public static class MapBuilder<K, V> {
 
-        private String mapName;
-        private MapCallback<K,V> callback;
-        private String partition;
-        private HazelcastInstance hazelcast;
-        private Predicate<K, V> callbackFilter;
-        private int domain;
+        protected String mapName;
+        protected MapCallback<K,V> callback;
+        protected String partition;
+        protected HazelcastInstance hazelcast;
+        protected Predicate<K, V> callbackFilter;
+        protected int domain;
 
         public MapBuilder(String mapName, int domain) {
             this.mapName = mapName;
@@ -47,9 +47,13 @@ public class DistributedMap {
             return this;
         }
 
+        public Config getConfig(){
+            return ConfigManagement.initializeConfig(domain, partition);
+        }
+
         public IMap<K, V> build() {
             if (hazelcast == null) {
-                Config config = ConfigManagement.initializeConfig(domain, partition);
+                Config config = getConfig();
                 this.hazelcast = Hazelcast.newHazelcastInstance(config);
             }
             IMap<K, V> map = hazelcast.getMap(mapName);
@@ -62,7 +66,5 @@ public class DistributedMap {
             }
             return map;
         }
-
-
     }
 }

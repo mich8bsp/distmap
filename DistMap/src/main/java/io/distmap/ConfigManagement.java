@@ -1,8 +1,10 @@
 package io.distmap;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.config.MapConfig;
+import com.hazelcast.config.MapStoreConfig;
 import com.hazelcast.config.MulticastConfig;
+import com.hazelcast.core.MapStore;
+import io.distmap.persistent.DBInfo;
 
 /**
  * Config management for network properties
@@ -10,11 +12,20 @@ import com.hazelcast.config.MulticastConfig;
  */
 public class ConfigManagement {
 
-    protected static Config initializeConfig(int domain, String partition) {
+    public static Config initializeConfig(int domain, String partition) {
         Config config = new Config();
         config.getGroupConfig().setName(partition);
         int multicastPort = getMulticastPortFromDomain(domain);
         config.getNetworkConfig().getJoin().getMulticastConfig().setMulticastPort(multicastPort);
+        return config;
+    }
+
+    public static Config addPersistence(Config config, String mapName, MapStore mapStore, MapStoreConfig.InitialLoadMode loadMode, DBInfo dbInfo) {
+        MapStoreConfig mapStoreConfig = config.getMapConfig(mapName).getMapStoreConfig();
+        mapStoreConfig.setClassName(mapStore.getClass().getName());
+        mapStoreConfig.setImplementation(mapStore);
+        mapStoreConfig.setInitialLoadMode(loadMode);
+        mapStoreConfig.setProperties(DBInfo.getProperties(dbInfo));
         return config;
     }
 
