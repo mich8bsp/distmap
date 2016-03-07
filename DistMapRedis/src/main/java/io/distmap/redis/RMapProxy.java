@@ -22,7 +22,7 @@ public class RMapProxy<K, V> implements Map<K, V> {
 
 
     public V put(K key, V value) {
-        createAndPublish(key, value, UpdateStatus.NEW);
+        createAndPublish(key, value, UpdateStatus.UPDATE);
         return map.put(key, value);
     }
 
@@ -34,7 +34,7 @@ public class RMapProxy<K, V> implements Map<K, V> {
     }
 
     public void putAll(Map<? extends K, ? extends V> m) {
-        m.entrySet().forEach(x -> createAndPublish(x.getKey(), x.getValue(), UpdateStatus.NEW));
+        m.entrySet().forEach(x -> createAndPublish(x.getKey(), x.getValue(), UpdateStatus.UPDATE));
         map.putAll(m);
     }
 

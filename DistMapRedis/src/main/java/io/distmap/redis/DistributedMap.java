@@ -66,7 +66,7 @@ public class DistributedMap<K, V> {
     private void createTopicListener() {
         RTopic<NotificationMsg<K, V>> listenerTopic = redisson.getTopic(mapName);
         listenerTopic.addListener((channel, msg) -> {
-            if (msg.getStatus().equals(UpdateStatus.NEW) || msg.getStatus().equals(UpdateStatus.UPDATE)) {
+            if (msg.getStatus().equals(UpdateStatus.UPDATE)) {
                 callback.onDataArrival(msg.getUpdate().getKey(), msg.getUpdate().getValue());
             } else if (msg.getStatus().equals(UpdateStatus.REMOVE)) {
                 callback.onDataRemoval(msg.getUpdate().getKey(), msg.getUpdate().getValue());
@@ -95,5 +95,9 @@ public class DistributedMap<K, V> {
             config.useSingleServer().setAddress("localhost:" + (BASE_PORT + domainId));
         }
         return config;
+    }
+
+    public void close(){
+        redisson.shutdown();
     }
 }
