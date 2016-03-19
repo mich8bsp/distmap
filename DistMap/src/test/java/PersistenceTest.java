@@ -1,14 +1,13 @@
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.IMap;
-import com.hazelcast.core.MapStore;
 import io.distmap.MapCallback;
 import io.distmap.persistent.AbstractMapStore;
 import io.distmap.persistent.DBInfo;
-import io.distmap.persistent.morphia.MorphiaMongoMapStore;
 import io.distmap.persistent.PersistentDistributedMap;
 import io.distmap.persistent.vertx.VertxMongoMapStore;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -26,7 +25,7 @@ public class PersistenceTest {
     private TestType result;
 
     @BeforeClass
-    public static void beforeInit(){
+    public static void beforeInit() {
         mapStore = new VertxMongoMapStore<TestType, TestType>() {
             @Override
             public Class<TestType> getStoredValueClass() {
@@ -42,12 +41,12 @@ public class PersistenceTest {
     }
 
 
-
+    @Ignore
     @Test
     public void persistenceTest() throws InterruptedException {
         int domain = 34;
-        Map<TestType, TestType> map1 = new PersistentDistributedMap.MapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
-        Map<TestType, TestType> map2 = new PersistentDistributedMap.MapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<TestType, TestType>(){
+        Map<TestType, TestType> map1 = new PersistentDistributedMap.PersistentMapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map2 = new PersistentDistributedMap.PersistentMapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<TestType, TestType>() {
             @Override
             public void entryAdded(EntryEvent<TestType, TestType> event) {
                 result = event.getValue();
@@ -63,14 +62,43 @@ public class PersistenceTest {
         Assert.assertEquals(item, result);
 
         result = null;
-        ((IMap)map1).destroy();
-        ((IMap)map2).destroy();
+        ((IMap) map1).destroy();
+        ((IMap) map2).destroy();
 
-        Map<TestType, TestType> map3 = new PersistentDistributedMap.MapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map3 = new PersistentDistributedMap.PersistentMapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
         Thread.sleep(1000);
         TestType fromDB = map3.get(item);
         Assert.assertNotNull(fromDB);
         Assert.assertEquals(item, fromDB);
 
+    }
+
+    @Test
+    public void testDirectToDB() throws InterruptedException {
+        int domain = 35;
+        Map<TestType, TestType> mapDirect = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
+        TestType item = new TestType();
+        item.setId(2341);
+        item.setName("test-name");
+        mapDirect.put(item, item);
+
+        Thread.sleep(5000);
+        TestType item2 = new TestType();
+        item2.setId(2341);
+        item2.setName("test");
+        result=null;
+        while(result==null) {
+            result = mapDirect.get(item2);
+            Thread.sleep(1000);
+        }
+        Assert.assertNotNull(result);
+        Assert.assertEquals(item, result);
+
+        Assert.assertFalse(mapDirect.isEmpty());
+
+        TestType removed = mapDirect.remove(item2);
+        Assert.assertNotNull(removed);
+        Assert.assertEquals(result, removed);
+        Assert.assertTrue(mapDirect.isEmpty());
     }
 }

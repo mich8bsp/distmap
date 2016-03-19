@@ -148,7 +148,7 @@ public class SimpleCommunicationTest {
 //
 //    @Test
 //    public void manualTest2() throws InterruptedException {
-//        IMap<String, String> mapWithListener = new DistributedMap.MapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new EntryUpdatedListener<String, String>() {
+//        IMap<String, String> mapWithListener = new DistributedMap.PersistentMapBuilder<String, String>(TEST_MAP).setPartition(DEFAULT_PARTITION).setListener(new EntryUpdatedListener<String, String>() {
 //
 //            public void entryUpdated(EntryEvent<String, String> event) {
 //                System.out.println("got result " + event.getValue());

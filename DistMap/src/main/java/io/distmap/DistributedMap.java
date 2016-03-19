@@ -9,7 +9,7 @@ import com.hazelcast.query.Predicate;
 import java.util.Map;
 
 /** Main builder for distributed map. should be used in the following way:
- * new DistributedMap.MapBuilder<K, V>(%MAP_NAME%).build();
+ * new DistributedMap.PersistentMapBuilder<K, V>(%MAP_NAME%).build();
  * Created by mich8bsp on 14-Jan-16.
  */
 public class DistributedMap {

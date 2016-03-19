@@ -9,10 +9,7 @@ import io.vertx.ext.mongo.FindOptions;
 import io.vertx.ext.mongo.MongoClient;
 
 import java.lang.reflect.Field;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -21,14 +18,15 @@ import java.util.stream.Collectors;
 /**
  * Created by mich8bsp on 19-Mar-16.
  */
-public abstract class VertxMongoMapStore<K extends Keyed, V> extends AbstractMapStore<K, V> {
+public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     private static final int LIMIT = 2;
     private static final String TIMESTAMP = "timestamp";
+    private static final String MONGO_DOCUMENT_ID = "_id";
     private static final long POLL_TIMEOUT = 5000;
     private MongoClient client;
 
-    private static JsonObject sorter = new JsonObject().put("sort", TIMESTAMP);
+    private static Comparator<JsonObject> sorter = (o1, o2) -> (int) (o1.getLong(TIMESTAMP) - o2.getLong(TIMESTAMP));
 
     @Override
     public void connectToDB(DBInfo dbInfo) {
@@ -38,7 +36,14 @@ public abstract class VertxMongoMapStore<K extends Keyed, V> extends AbstractMap
     }
 
     protected static JsonObject getConfig(DBInfo dbInfo) {
-        return new JsonObject();
+        JsonObject config = new JsonObject();
+        config.put("host", dbInfo.getDbHosts().get(0));
+        config.put("port", DEFAULT_MONGO_PORT);
+        config.put("username", dbInfo.getUserName());
+        config.put("password", dbInfo.getPassword());
+        config.put("db_name", dbInfo.getDbName());
+        return config;
+
     }
 
     @Override
@@ -63,9 +68,10 @@ public abstract class VertxMongoMapStore<K extends Keyed, V> extends AbstractMap
 
     private void ensureMaxSamplesPerInstance(JsonObject keyQuery, int limit) {
 
-        client.findWithOptions(getCollectionName(), keyQuery, new FindOptions().setSort(sorter), res -> {
+        client.find(getCollectionName(), keyQuery, res -> {
             if (res.succeeded()) {
                 List<JsonObject> historicalValues = res.result();
+                historicalValues.sort(sorter);
                 if (historicalValues.size() > limit && limit > 0) {
                     long lastRelevantTime = historicalValues.get(historicalValues.size() - limit + 1).getLong(TIMESTAMP);
                     DBObject builder = QueryBuilder.start().put(TIMESTAMP).lessThan(lastRelevantTime).get();
@@ -83,7 +89,7 @@ public abstract class VertxMongoMapStore<K extends Keyed, V> extends AbstractMap
         JsonObject keyJson = SerializationHelper.saveObjectToJson(key);
         if (keyJson != null) {
             JsonObject keyQuery = keyJson.copy();
-            List<String> keyFields = Arrays.asList(key.getKeyFields()).stream().map(Field::getName).collect(Collectors.toList());
+            List<String> keyFields = getKeyFields().stream().map(Field::getName).collect(Collectors.toList());
             keyJson.fieldNames().stream().filter(field -> !keyFields.contains(field)).forEach(keyQuery::remove);
             return keyQuery;
         } else {
@@ -91,6 +97,15 @@ public abstract class VertxMongoMapStore<K extends Keyed, V> extends AbstractMap
         }
     }
 
+    public List<Field> getKeyFields(){
+        List<Field> keyFields = new LinkedList<>();
+        for(Field field : getStoredKeyClass().getDeclaredFields()){
+            if(field.isAnnotationPresent(Key.class)){
+                keyFields.add(field);
+            }
+        }
+        return keyFields;
+    }
 
     @Override
     public void delete(K key) {
@@ -107,10 +122,13 @@ public abstract class VertxMongoMapStore<K extends Keyed, V> extends AbstractMap
         try {
             BlockingQueue<JsonObject> resultQueue = new LinkedBlockingQueue<>(1);
             JsonObject keyQuery = buildKeyQuery(key);
-            client.findWithOptions(getCollectionName(), keyQuery, new FindOptions().setSort(sorter), res -> {
+            client.find(getCollectionName(), keyQuery, res -> {
                 if (res.succeeded() && res.result().size() > 0) {
-                    JsonObject result = res.result().get(res.result().size() - 1);
+                    List<JsonObject> results = res.result();
+                    results.sort(sorter);
+                    JsonObject result = results.get(res.result().size() - 1);
                     result.remove(TIMESTAMP);
+                    result.remove(MONGO_DOCUMENT_ID);
                     resultQueue.offer(result);
                 }
             });
