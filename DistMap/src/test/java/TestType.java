@@ -1,12 +1,15 @@
+import io.distmap.persistent.morphia.IStorable;
+import io.distmap.persistent.vertx.Keyed;
+import org.mongodb.morphia.annotations.Entity;
+import org.mongodb.morphia.annotations.Id;
+
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * Created by אלכס on 25/02/2016.
- */
-public class TestType implements Serializable{
+public class TestType implements Serializable, Keyed{
 
     private int id;
     private String name ="testname";
@@ -79,5 +82,15 @@ public class TestType implements Serializable{
     public TestType setListSomething(List<Integer> listSomething) {
         this.listSomething = listSomething;
         return this;
+    }
+
+    @Override
+    public Field[] getKeyFields() {
+        try {
+            return new Field[]{TestType.class.getDeclaredField("id")};
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+            return new Field[0];
+        }
     }
 }

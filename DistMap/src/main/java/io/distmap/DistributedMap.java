@@ -6,6 +6,8 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.query.Predicate;
 
+import java.util.Map;
+
 /** Main builder for distributed map. should be used in the following way:
  * new DistributedMap.MapBuilder<K, V>(%MAP_NAME%).build();
  * Created by mich8bsp on 14-Jan-16.
@@ -51,7 +53,7 @@ public class DistributedMap {
             return ConfigManagement.initializeConfig(domain, partition);
         }
 
-        public IMap<K, V> build() {
+        public Map<K, V> build() {
             if (hazelcast == null) {
                 Config config = getConfig();
                 this.hazelcast = Hazelcast.newHazelcastInstance(config);
