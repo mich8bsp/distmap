@@ -5,7 +5,6 @@ import com.mongodb.QueryBuilder;
 import io.distmap.persistent.AbstractMapStore;
 import io.distmap.persistent.DBInfo;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.mongo.FindOptions;
 import io.vertx.ext.mongo.MongoClient;
 
 import java.lang.reflect.Field;
@@ -15,14 +14,18 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Created by mich8bsp on 19-Mar-16.
  */
 public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
+    //FIXME: make this configurable (2 is a sane default)
     private static final int LIMIT = 2;
     private static final String TIMESTAMP = "timestamp";
     private static final String MONGO_DOCUMENT_ID = "_id";
+    //FIXME: make this configurable (need to think about a good default... 1 sec?)
     private static final long POLL_TIMEOUT = 5000;
     private MongoClient client;
 
@@ -48,13 +51,12 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     @Override
     public void store(K key, V value) {
+        requireNonNull(client, "Mongo client cannot be null");
         try {
             JsonObject keyQuery = buildKeyQuery(key);
             JsonObject jsonValue = SerializationHelper.saveObjectToJson(value);
-            if (keyQuery == null || jsonValue == null) {
-                //log errors
-                return;
-            }
+            requireNonNull(keyQuery, "Key query cannot be null, all entities must be keyed");
+            requireNonNull(jsonValue, "Failed to serialize value to json");
             jsonValue.put(TIMESTAMP, System.currentTimeMillis());
             client.save(getCollectionName(), jsonValue, res -> {
                 if (res.succeeded()) {
@@ -67,7 +69,7 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     }
 
     private void ensureMaxSamplesPerInstance(JsonObject keyQuery, int limit) {
-
+        requireNonNull(client, "Mongo client cannot be null");
         client.find(getCollectionName(), keyQuery, res -> {
             if (res.succeeded()) {
                 List<JsonObject> historicalValues = res.result();
@@ -89,8 +91,12 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
         JsonObject keyJson = SerializationHelper.saveObjectToJson(key);
         if (keyJson != null) {
             JsonObject keyQuery = keyJson.copy();
-            List<String> keyFields = getKeyFields().stream().map(Field::getName).collect(Collectors.toList());
-            keyJson.fieldNames().stream().filter(field -> !keyFields.contains(field)).forEach(keyQuery::remove);
+            List<Field> keyFields = getKeyFields();
+            if(keyFields==null || keyFields.isEmpty()){
+                return null;
+            }
+            List<String> keyFieldNames = keyFields.stream().map(Field::getName).collect(Collectors.toList());
+            keyJson.fieldNames().stream().filter(field -> !keyFieldNames.contains(field)).forEach(keyQuery::remove);
             return keyQuery;
         } else {
             return null;
