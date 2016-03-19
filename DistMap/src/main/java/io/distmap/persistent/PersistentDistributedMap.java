@@ -12,25 +12,25 @@ import java.util.Map;
  */
 public class PersistentDistributedMap {
 
-    public static class MapBuilder<K, V> extends DistributedMap.MapBuilder<K, V> {
+    public static class PersistentMapBuilder<K, V> extends DistributedMap.MapBuilder<K, V> {
 
         private final AbstractMapStore<K, V> mapStore;
         private MapStoreConfig.InitialLoadMode loadMode = MapStoreConfig.InitialLoadMode.LAZY;
         private DBInfo dbInfo;
         private boolean directToDB;
 
-        public MapBuilder(String mapName, int domain, AbstractMapStore<K, V> mapStore, DBInfo dbInfo) {
+        public PersistentMapBuilder(String mapName, int domain, AbstractMapStore<K, V> mapStore, DBInfo dbInfo) {
             super(mapName, domain);
             this.mapStore = mapStore;
             this.dbInfo = dbInfo;
         }
 
-        private MapBuilder<K, V> setInitialLoadMode(MapStoreConfig.InitialLoadMode loadMode) {
+        public PersistentMapBuilder<K, V> setInitialLoadMode(MapStoreConfig.InitialLoadMode loadMode) {
             this.loadMode = loadMode;
             return this;
         }
 
-        private MapBuilder<K, V> setDirectToDB(boolean directToDB) {
+        public PersistentMapBuilder<K, V> setDirectToDB(boolean directToDB) {
             this.directToDB = directToDB;
             return this;
         }
@@ -46,6 +46,8 @@ public class PersistentDistributedMap {
             if (!directToDB) {
                 return super.build();
             } else {
+                mapStore.connectToDB(dbInfo);
+                mapStore.setCollectionName(dbInfo.getDbName());
                 return MapStoreProxy.toMap(mapStore);
             }
         }
