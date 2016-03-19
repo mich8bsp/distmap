@@ -7,6 +7,7 @@ import io.distmap.persistent.PersistentDistributedMap;
 import io.distmap.persistent.vertx.VertxMongoMapStore;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -40,6 +41,7 @@ public class PersistenceTest {
     }
 
 
+    @Ignore
     @Test
     public void persistenceTest() throws InterruptedException {
         int domain = 34;
