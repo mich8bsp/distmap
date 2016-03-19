@@ -1,6 +1,7 @@
 package io.distmap;
 
 import com.hazelcast.config.Config;
+import com.hazelcast.config.MapConfig;
 import com.hazelcast.config.MapStoreConfig;
 import com.hazelcast.config.MulticastConfig;
 import com.hazelcast.core.MapStore;
@@ -21,7 +22,18 @@ public class ConfigManagement {
     }
 
     public static Config addPersistence(Config config, String mapName, MapStore mapStore, MapStoreConfig.InitialLoadMode loadMode, DBInfo dbInfo) {
-        MapStoreConfig mapStoreConfig = config.getMapConfig(mapName).getMapStoreConfig();
+        MapConfig mapConfig = config.getMapConfig(mapName);
+        if(mapConfig==null){
+            mapConfig = new MapConfig();
+            mapConfig.setName(mapName);
+            config.addMapConfig(mapConfig);
+        }
+
+        MapStoreConfig mapStoreConfig = mapConfig.getMapStoreConfig();
+        if(mapStoreConfig==null){
+            mapStoreConfig = new MapStoreConfig();
+            mapConfig.setMapStoreConfig(mapStoreConfig);
+        }
         mapStoreConfig.setClassName(mapStore.getClass().getName());
         mapStoreConfig.setImplementation(mapStore);
         mapStoreConfig.setInitialLoadMode(loadMode);

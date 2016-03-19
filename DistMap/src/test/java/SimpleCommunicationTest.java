@@ -15,7 +15,7 @@ import java.util.Map;
 public class SimpleCommunicationTest {
 
     private static final String TEST_MAP = "TEST_MAP";
-    private static IMap<String, String> map;
+    private static Map<String, String> map;
     private static final String DEFAULT_PARTITION = "aaa";
 
     private String result;
@@ -33,7 +33,7 @@ public class SimpleCommunicationTest {
     public void testSendReceive() throws InterruptedException {
         System.out.println("Putting at time " + System.currentTimeMillis());
         map.put("test", "dfs");
-        IMap<String, String> map2 = new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition("bbb").build();
+        Map<String, String> map2 = new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition("bbb").build();
         Thread.sleep(5000);
         System.out.println("Putting at time " + System.currentTimeMillis());
         map.put("test", "dfs");
