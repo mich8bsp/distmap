@@ -5,10 +5,7 @@ import io.distmap.persistent.AbstractMapStore;
 import io.distmap.persistent.DBInfo;
 import io.distmap.persistent.PersistentDistributedMap;
 import io.distmap.persistent.vertx.VertxMongoMapStore;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.*;
 
 import java.util.Collections;
 import java.util.Map;
@@ -40,13 +37,21 @@ public class PersistenceTest {
         dbInfo = new DBInfo("test-db", Collections.singletonList("localhost"), "guest", "guest");
     }
 
+    @Before
+    public void cleanup() {
+        Map<TestType, TestType> map1 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, 34, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map2 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, 35, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
 
-   // @Ignore
+        map1.clear();
+        map2.clear();
+    }
+
+    // @Ignore
     @Test
     public void persistenceTest() throws InterruptedException {
         int domain = 34;
-        Map<TestType, TestType> map1 = new PersistentDistributedMap.PersistentMapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
-        Map<TestType, TestType> map2 = new PersistentDistributedMap.PersistentMapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<TestType, TestType>() {
+        Map<TestType, TestType> map1 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map2 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<TestType, TestType>() {
             @Override
             public void entryAdded(EntryEvent<TestType, TestType> event) {
                 result = event.getValue();
@@ -65,7 +70,7 @@ public class PersistenceTest {
         ((IMap) map1).destroy();
         ((IMap) map2).destroy();
 
-        Map<TestType, TestType> map3 = new PersistentDistributedMap.PersistentMapBuilder<TestType, TestType>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map3 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
         Thread.sleep(1000);
         TestType fromDB = map3.get(item);
         Assert.assertNotNull(fromDB);
@@ -86,8 +91,8 @@ public class PersistenceTest {
         TestType item2 = new TestType();
         item2.setId(2341);
         item2.setName("test");
-        result=null;
-        while(result==null) {
+        result = null;
+        while (result == null) {
             result = mapDirect.get(item2);
             Thread.sleep(1000);
         }
@@ -100,5 +105,25 @@ public class PersistenceTest {
         Assert.assertNotNull(removed);
         Assert.assertEquals(result, removed);
         Assert.assertTrue(mapDirect.isEmpty());
+    }
+
+    @Test
+    public void testEmpty() {
+        int domain = 35;
+        Map<TestType, TestType> mapDirect = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
+        mapDirect.clear();
+        TestType item2 = new TestType();
+        item2.setId(2343);
+        item2.setName("test");
+        Assert.assertNull(mapDirect.remove(item2));
+        Assert.assertFalse(mapDirect.containsKey(item2));
+        Assert.assertFalse(mapDirect.containsValue(item2));
+        Assert.assertTrue(mapDirect.entrySet().isEmpty());
+        Assert.assertNull(mapDirect.get(item2));
+        Assert.assertTrue(mapDirect.isEmpty());
+        Assert.assertEquals(0, mapDirect.size());
+        Assert.assertTrue(mapDirect.keySet().isEmpty());
+        Assert.assertTrue(mapDirect.values().isEmpty());
+
     }
 }
