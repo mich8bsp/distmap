@@ -43,6 +43,7 @@ public class PersistentDistributedMap {
 
         @Override
         public Map<K, V> build() {
+            dbInfo.appendDBNameEnvironment("_"+domain+"_"+partition);
             if (!directToDB) {
                 return super.build();
             } else {
