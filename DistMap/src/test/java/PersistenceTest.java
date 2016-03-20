@@ -96,7 +96,8 @@ public class PersistenceTest {
         item2.setId(2341);
         item2.setName("test");
         result = null;
-        while (result == null) {
+        long time = System.currentTimeMillis();
+        while (result == null && (System.currentTimeMillis() - time) < 5000) {
             result = mapDirect.get(item2);
             Thread.sleep(1000);
         }
@@ -137,7 +138,7 @@ public class PersistenceTest {
         int domain = 35;
         Map<TestType, TestType> mapDirect = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
         items.forEach(item -> {
-            for(int i=0;i<5;i++) {
+            for (int i = 0; i < 5; i++) {
                 mapDirect.put(cleanKey(item), item);
             }
         });
@@ -152,6 +153,10 @@ public class PersistenceTest {
 
         Set<Map.Entry<TestType, TestType>> entries = mapDirect.entrySet();
         Assert.assertEquals(items.stream().map(x -> new AbstractMap.SimpleEntry<>(cleanKey(x), x)).collect(Collectors.toSet()), entries);
+        mapDirect.clear();
+        Assert.assertEquals(0, mapDirect.keySet().size());
+        Assert.assertEquals(0, mapDirect.values().size());
+        Assert.assertEquals(0, mapDirect.entrySet().size());
     }
 
     private TestType cleanKey(TestType item) {
