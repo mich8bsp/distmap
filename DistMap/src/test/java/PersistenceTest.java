@@ -66,7 +66,7 @@ public class PersistenceTest {
         item.setName("test-name");
         map1.put(item, item);
 
-        Thread.sleep(5000);
+        Thread.sleep(1000);
         Assert.assertNotNull(result);
         Assert.assertEquals(item, result);
 
@@ -90,17 +90,11 @@ public class PersistenceTest {
         item.setId(2341);
         item.setName("test-name");
         mapDirect.put(item, item);
-
-        Thread.sleep(5000);
         TestType item2 = new TestType();
         item2.setId(2341);
         item2.setName("test");
-        result = null;
-        long time = System.currentTimeMillis();
-        while (result == null && (System.currentTimeMillis() - time) < 5000) {
-            result = mapDirect.get(item2);
-            Thread.sleep(1000);
-        }
+        result = mapDirect.get(item2);
+
         Assert.assertNotNull(result);
         Assert.assertEquals(item, result);
 
