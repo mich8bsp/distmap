@@ -6,6 +6,7 @@ import com.hazelcast.core.MapStore;
 import com.mongodb.ServerAddress;
 
 import java.util.*;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 /**
@@ -15,6 +16,9 @@ public abstract class AbstractMapStore<K, V> implements MapStore<K, V>, MapLoade
 
     public static final int DEFAULT_MONGO_PORT = 27017;
     private String collectionName;
+
+    private static final String KEYS_COLLECTION_SUFFIX = "_keys";
+    private static final String VALUES_COLLECTION_SUFFIX = "_values";
 
     @Override
     public void init(HazelcastInstance hazelcastInstance, Properties properties, String mapName) {
@@ -30,8 +34,13 @@ public abstract class AbstractMapStore<K, V> implements MapStore<K, V>, MapLoade
 
     public abstract void connectToDB(DBInfo dbInfo);
 
-    public String getCollectionName() {
-        return collectionName;
+
+    public String getKeysCollectionName(){
+        return collectionName + KEYS_COLLECTION_SUFFIX;
+    }
+
+    public String getValuesCollectionName(){
+        return collectionName + VALUES_COLLECTION_SUFFIX;
     }
 
     public void setCollectionName(String collectionName) {
@@ -47,10 +56,6 @@ public abstract class AbstractMapStore<K, V> implements MapStore<K, V>, MapLoade
         map.entrySet().stream().forEach(x -> store(x.getKey(), x.getValue()));
     }
 
-    @Override
-    public void deleteAll(Collection<K> collection) {
-        collection.forEach(this::delete);
-    }
 
     @Override
     public Map<K, V> loadAll(Collection<K> collection) {
@@ -77,6 +82,23 @@ public abstract class AbstractMapStore<K, V> implements MapStore<K, V>, MapLoade
         }).collect(Collectors.toList());
     }
 
+    @Override
+    public void deleteAll(Collection<K> keys){
+        keys.forEach(this::delete);
+    }
+
+    public Collection<V> loadAllValues() {
+        return getEntrySet().stream().map(Map.Entry::getValue).collect(Collectors.toSet());
+    }
+
+    public boolean containsValue(Object value) {
+       return loadAllValues().contains(value);
+    }
+
     public abstract int size();
     public abstract Set<Map.Entry<K, V>> getEntrySet();
+    public abstract boolean containsKey(K key);
+    public abstract void deleteAll();
+
+
 }

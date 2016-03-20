@@ -1,11 +1,12 @@
 package io.distmap.persistent.vertx;
 
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.util.IterableUtil;
 import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
 import io.distmap.persistent.AbstractMapStore;
 import io.distmap.persistent.DBInfo;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.mongo.FindOptions;
 import io.vertx.ext.mongo.MongoClient;
 
 import java.lang.reflect.Field;
@@ -15,15 +16,20 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Created by mich8bsp on 19-Mar-16.
  */
 public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
+    //FIXME: make this configurable (2 is a sane default)
     private static final int LIMIT = 2;
     private static final String TIMESTAMP = "timestamp";
     private static final String MONGO_DOCUMENT_ID = "_id";
+    //FIXME: make this configurable (need to think about a good default... 1 sec?)
     private static final long POLL_TIMEOUT = 5000;
+    private static final String KEY_ID = "keyId";
     private MongoClient client;
 
     private static Comparator<JsonObject> sorter = (o1, o2) -> (int) (o1.getLong(TIMESTAMP) - o2.getLong(TIMESTAMP));
@@ -32,7 +38,6 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     public void connectToDB(DBInfo dbInfo) {
         JsonObject config = getConfig(dbInfo);
         client = MongoClient.createShared(VertxUtils.getInstance(), config);
-
     }
 
     protected static JsonObject getConfig(DBInfo dbInfo) {
@@ -48,27 +53,62 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     @Override
     public void store(K key, V value) {
+        requireNonNull(client, "Mongo client cannot be null");
         try {
-            JsonObject keyQuery = buildKeyQuery(key);
             JsonObject jsonValue = SerializationHelper.saveObjectToJson(value);
-            if (keyQuery == null || jsonValue == null) {
-                //log errors
+            requireNonNull(jsonValue, "Failed to serialize value to json");
+            String keyId = getKeyId(key, true);
+            if (keyId == null) {
+                //saving key failed
                 return;
             }
             jsonValue.put(TIMESTAMP, System.currentTimeMillis());
-            client.save(getCollectionName(), jsonValue, res -> {
+            jsonValue.put(KEY_ID, keyId);
+            client.save(getValuesCollectionName(), jsonValue, res -> {
                 if (res.succeeded()) {
-                    ensureMaxSamplesPerInstance(keyQuery, LIMIT);
+                    ensureMaxSamplesPerInstance(keyId, LIMIT);
                 }
             });
-        } catch (IllegalAccessException e) {
+        } catch (IllegalAccessException | InterruptedException e) {
             e.printStackTrace();
         }
     }
 
-    private void ensureMaxSamplesPerInstance(JsonObject keyQuery, int limit) {
+    private String getKeyId(K key, boolean insertIfNotExist) throws IllegalAccessException, InterruptedException {
+        JsonObject keyQuery = buildKeyFieldQuery(key);
+        requireNonNull(keyQuery, "Key query cannot be null, all entities must be keyed");
+        BlockingQueue<String> keyIdQueue = new LinkedBlockingQueue<>(1);
+        client.find(getKeysCollectionName(), keyQuery, res -> {
+            if (res.succeeded() && res.result().size() > 0) {
+                JsonObject storedKey = res.result().get(0);
+                String keyId = storedKey.getString(MONGO_DOCUMENT_ID);
+                keyIdQueue.add(keyId);
+            } else {
+                if (insertIfNotExist) {
+                    JsonObject keyAsJson = SerializationHelper.saveObjectToJson(key);
+                    client.save(getKeysCollectionName(), keyAsJson, saveRes -> {
+                        if (saveRes.succeeded()) {
+                            String keyId = saveRes.result();
+                            keyIdQueue.add(keyId);
+                        }
+                    });
+                } else {
+                    keyIdQueue.add("");
+                }
+            }
+        });
+        String keyId = keyIdQueue.poll(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+        if (keyId == null || keyId.isEmpty()) {
+            return null;
+        } else {
+            return keyId;
+        }
+    }
 
-        client.find(getCollectionName(), keyQuery, res -> {
+    private void ensureMaxSamplesPerInstance(String keyId, int limit) {
+        requireNonNull(client, "Mongo client cannot be null");
+        JsonObject keyQuery = buildKeyIdQuery(keyId);
+        client.find(getValuesCollectionName(), keyQuery, res -> {
             if (res.succeeded()) {
                 List<JsonObject> historicalValues = res.result();
                 historicalValues.sort(sorter);
@@ -77,7 +117,7 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
                     DBObject builder = QueryBuilder.start().put(TIMESTAMP).lessThan(lastRelevantTime).get();
                     JsonObject removeQuery = new JsonObject(builder.toMap());
                     removeQuery.mergeIn(keyQuery);
-                    client.remove(getCollectionName(), removeQuery, removeRes -> {
+                    client.remove(getValuesCollectionName(), removeQuery, removeRes -> {
 
                     });
                 }
@@ -85,22 +125,30 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
         });
     }
 
-    private JsonObject buildKeyQuery(K key) throws IllegalAccessException {
+    private JsonObject buildKeyIdQuery(String keyId) {
+        return new JsonObject().put(KEY_ID, keyId);
+    }
+
+    private JsonObject buildKeyFieldQuery(K key) throws IllegalAccessException {
         JsonObject keyJson = SerializationHelper.saveObjectToJson(key);
         if (keyJson != null) {
             JsonObject keyQuery = keyJson.copy();
-            List<String> keyFields = getKeyFields().stream().map(Field::getName).collect(Collectors.toList());
-            keyJson.fieldNames().stream().filter(field -> !keyFields.contains(field)).forEach(keyQuery::remove);
+            List<Field> keyFields = getKeyFields();
+            if (keyFields == null || keyFields.isEmpty()) {
+                return null;
+            }
+            List<String> keyFieldNames = keyFields.stream().map(Field::getName).collect(Collectors.toList());
+            keyJson.fieldNames().stream().filter(field -> !keyFieldNames.contains(field)).forEach(keyQuery::remove);
             return keyQuery;
         } else {
             return null;
         }
     }
 
-    public List<Field> getKeyFields(){
+    public List<Field> getKeyFields() {
         List<Field> keyFields = new LinkedList<>();
-        for(Field field : getStoredKeyClass().getDeclaredFields()){
-            if(field.isAnnotationPresent(Key.class)){
+        for (Field field : getStoredKeyClass().getDeclaredFields()) {
+            if (field.isAnnotationPresent(Key.class)) {
                 keyFields.add(field);
             }
         }
@@ -110,25 +158,31 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     @Override
     public void delete(K key) {
         try {
-            JsonObject keyQuery = buildKeyQuery(key);
-            client.remove(getCollectionName(), keyQuery, res -> {
+            String keyId = getKeyId(key, false);
+            if (keyId == null) {
+                return;
+            }
+            JsonObject keyQuery = buildKeyFieldQuery(key);
+            client.remove(getKeysCollectionName(), keyQuery, res -> {
             });
-        } catch (IllegalAccessException e) {
+            client.remove(getValuesCollectionName(), buildKeyIdQuery(keyId), res -> {
+            });
+        } catch (IllegalAccessException | InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
     @Override
     public V load(K key) {
         try {
+            String keyId = getKeyId(key, false);
             BlockingQueue<JsonObject> resultQueue = new LinkedBlockingQueue<>(1);
-            JsonObject keyQuery = buildKeyQuery(key);
-            client.find(getCollectionName(), keyQuery, res -> {
+            client.find(getValuesCollectionName(), buildKeyIdQuery(keyId), res -> {
                 if (res.succeeded() && res.result().size() > 0) {
                     List<JsonObject> results = res.result();
                     results.sort(sorter);
                     JsonObject result = results.get(res.result().size() - 1);
-                    result.remove(TIMESTAMP);
-                    result.remove(MONGO_DOCUMENT_ID);
+                    processValueAfterRetrieving(result);
                     resultQueue.offer(result);
                 }
             });
@@ -142,17 +196,24 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
         return null;
     }
 
-    @Override
-    public Iterable<K> loadAllKeys() {
-        throw new UnsupportedOperationException();
+    private void processValueAfterRetrieving(JsonObject result) {
+        result.remove(TIMESTAMP);
+        result.remove(MONGO_DOCUMENT_ID);
+        result.remove(KEY_ID);
+    }
+
+    private void processKeyAfterRetrieving(JsonObject result) {
+        result.remove(MONGO_DOCUMENT_ID);
     }
 
     public int size() {
         BlockingQueue<Integer> resQueue = new LinkedBlockingQueue<>(1);
-        client.count(getCollectionName(), new JsonObject(), res -> {
+        client.find(getValuesCollectionName(), new JsonObject(), res -> {
             //log result
             if (res.succeeded()) {
-                resQueue.offer(res.result().intValue());
+                resQueue.offer((int) res.result().stream().map(x -> x.getString(KEY_ID)).distinct().count());
+            } else {
+                resQueue.offer(-1);
             }
         });
         try {
@@ -165,8 +226,75 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     }
 
     public Set<Map.Entry<K, V>> getEntrySet() {
-        throw new UnsupportedOperationException();
+        Iterable<K> keys = loadAllKeys();
+        if(keys==null){
+            return null;
+        }
+        Set<Map.Entry<K, V>> entries = new HashSet<>();
+        for(K key : keys){
+            Map.Entry<K, V> entry = new AbstractMap.SimpleEntry<>(key, load(key));
+            entries.add(entry);
+        }
+        return entries;
     }
+
+
+    @Override
+    public Iterable<K> loadAllKeys() {
+        BlockingQueue<Integer> countQueue = new LinkedBlockingQueue<>(1);
+        BlockingQueue<JsonObject> resultsQueue = new LinkedBlockingQueue<>();
+        client.find(getKeysCollectionName(), new JsonObject(), res -> {
+            if (res.succeeded()) {
+                List<JsonObject> results = res.result();
+                results.forEach(this::processKeyAfterRetrieving);
+                countQueue.offer(results.size());
+                resultsQueue.addAll(results);
+            }
+        });
+        try {
+            Integer count = countQueue.poll(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+            if (count == null) {
+                //failed
+                return null;
+            }
+            if (count == 0) {
+                return new LinkedList<>();
+            }
+            List<JsonObject> allResults = new LinkedList<>();
+            JsonObject firstResult = resultsQueue.poll(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+            allResults.add(firstResult);
+            long currentTime = System.currentTimeMillis();
+            while (allResults.size() < count) {
+                resultsQueue.drainTo(allResults);
+                if (System.currentTimeMillis() - currentTime > POLL_TIMEOUT) {
+                    break;
+                }
+            }
+            return allResults.stream().map(x -> SerializationHelper.readObjectFromJson(x, getStoredKeyClass())).collect(Collectors.toList());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    public void deleteAll(){
+        client.dropCollection(getKeysCollectionName(), res -> {});
+        client.dropCollection(getValuesCollectionName(), res -> {});
+    }
+
+
+    @Override
+    public boolean containsKey(K key) {
+        String keyId = null;
+        try {
+            keyId = getKeyId(key, false);
+        } catch (IllegalAccessException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        return keyId!=null;
+    }
+
 
     @Override
     public void destroy() {

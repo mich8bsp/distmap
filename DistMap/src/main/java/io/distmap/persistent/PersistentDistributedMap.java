@@ -47,7 +47,7 @@ public class PersistentDistributedMap {
                 return super.build();
             } else {
                 mapStore.connectToDB(dbInfo);
-                mapStore.setCollectionName(dbInfo.getDbName());
+                mapStore.setCollectionName(mapName);
                 return MapStoreProxy.toMap(mapStore);
             }
         }
