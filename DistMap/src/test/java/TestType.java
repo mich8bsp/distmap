@@ -7,6 +7,15 @@ import java.util.Arrays;
 import java.util.List;
 
 public class TestType implements Serializable{
+    @Override
+    public String toString() {
+        return "TestType{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", something=" + Arrays.toString(something) +
+                ", listSomething=" + listSomething +
+                '}';
+    }
 
     @Key
     private int id;

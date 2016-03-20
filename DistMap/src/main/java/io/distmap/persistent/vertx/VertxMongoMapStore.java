@@ -9,9 +9,9 @@ import io.vertx.ext.mongo.MongoClient;
 
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -51,6 +51,10 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     @Override
     public void store(K key, V value) {
+        this.store(key, value, false);
+    }
+
+    public void store(K key, V value, boolean async) {
         requireNonNull(client, "Mongo client cannot be null");
         try {
             JsonObject jsonValue = SerializationHelper.saveObjectToJson(value);
@@ -62,11 +66,16 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
             }
             jsonValue.put(TIMESTAMP, System.currentTimeMillis());
             jsonValue.put(KEY_ID, keyId);
+            CountDownLatch latch = new CountDownLatch(1);
             client.save(getValuesCollectionName(), jsonValue, res -> {
                 if (res.succeeded()) {
                     ensureMaxSamplesPerInstance(keyId, LIMIT);
                 }
+                latch.countDown();
             });
+            if (!async) {
+                latch.await(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+            }
         } catch (IllegalAccessException | InterruptedException e) {
             e.printStackTrace();
         }
@@ -75,32 +84,34 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     private String getKeyId(K key, boolean insertIfNotExist) throws IllegalAccessException, InterruptedException {
         JsonObject keyQuery = buildKeyFieldQuery(key);
         requireNonNull(keyQuery, "Key query cannot be null, all entities must be keyed");
-        BlockingQueue<String> keyIdQueue = new LinkedBlockingQueue<>(1);
+        List<String> keyIdList = new ArrayList<>(1);
+        CountDownLatch latch = new CountDownLatch(1);
         client.find(getKeysCollectionName(), keyQuery, res -> {
             if (res.succeeded() && res.result().size() > 0) {
                 JsonObject storedKey = res.result().get(0);
                 String keyId = storedKey.getString(MONGO_DOCUMENT_ID);
-                keyIdQueue.add(keyId);
+                keyIdList.add(keyId);
+                latch.countDown();
             } else {
                 if (insertIfNotExist) {
                     JsonObject keyAsJson = SerializationHelper.saveObjectToJson(key);
                     client.save(getKeysCollectionName(), keyAsJson, saveRes -> {
                         if (saveRes.succeeded()) {
                             String keyId = saveRes.result();
-                            keyIdQueue.add(keyId);
+                            keyIdList.add(keyId);
                         }
+                        latch.countDown();
                     });
                 } else {
-                    keyIdQueue.add("");
+                    latch.countDown();
                 }
             }
         });
-        String keyId = keyIdQueue.poll(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
-        if (keyId == null || keyId.isEmpty()) {
+        latch.await(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+        if (keyIdList.isEmpty()) {
             return null;
-        } else {
-            return keyId;
         }
+        return keyIdList.get(0);
     }
 
     private void ensureMaxSamplesPerInstance(String keyId, int limit) {
@@ -161,10 +172,10 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
                 return;
             }
             JsonObject keyQuery = buildKeyFieldQuery(key);
-            client.remove(getKeysCollectionName(), keyQuery, res -> {
-            });
-            client.remove(getValuesCollectionName(), buildKeyIdQuery(keyId), res -> {
-            });
+            CountDownLatch latch = new CountDownLatch(2);
+            client.remove(getKeysCollectionName(), keyQuery, res -> latch.countDown());
+            client.remove(getValuesCollectionName(), buildKeyIdQuery(keyId), res -> latch.countDown());
+            latch.await(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
         } catch (IllegalAccessException | InterruptedException e) {
             e.printStackTrace();
         }
@@ -173,20 +184,24 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     @Override
     public V load(K key) {
         try {
+            CountDownLatch latch = new CountDownLatch(1);
             String keyId = getKeyId(key, false);
-            BlockingQueue<JsonObject> resultQueue = new LinkedBlockingQueue<>(1);
+            List<JsonObject> receivedResult = new ArrayList<>(1);
             client.find(getValuesCollectionName(), buildKeyIdQuery(keyId), res -> {
                 if (res.succeeded() && res.result().size() > 0) {
                     List<JsonObject> results = res.result();
-                    results.sort(sorter);
-                    JsonObject result = results.get(res.result().size() - 1);
+                    JsonObject result = results.stream().max(sorter).get();
                     processValueAfterRetrieving(result);
-                    resultQueue.offer(result);
+                    receivedResult.add(result);
                 }
+                latch.countDown();
             });
-            JsonObject result = resultQueue.poll(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
-            if (result != null) {
-                return SerializationHelper.readObjectFromJson(result, getStoredValueClass());
+            latch.await(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+            if (receivedResult.size() > 0) {
+                JsonObject result = receivedResult.get(0);
+                if (result != null) {
+                    return SerializationHelper.readObjectFromJson(result, getStoredValueClass());
+                }
             }
         } catch (IllegalAccessException | InterruptedException e) {
             e.printStackTrace();
@@ -205,18 +220,18 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     }
 
     public int size() {
-        BlockingQueue<Integer> resQueue = new LinkedBlockingQueue<>(1);
+        AtomicInteger count = new AtomicInteger(-1);
+        CountDownLatch latch = new CountDownLatch(1);
         client.find(getValuesCollectionName(), new JsonObject(), res -> {
             //log result
             if (res.succeeded()) {
-                resQueue.offer((int) res.result().stream().map(x -> x.getString(KEY_ID)).distinct().count());
-            } else {
-                resQueue.offer(-1);
+                count.set((int) res.result().stream().map(x -> x.getString(KEY_ID)).distinct().count());
             }
+            latch.countDown();
         });
         try {
-            Integer size = resQueue.poll(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
-            return (size == null) ? -1 : size;
+            latch.await(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+            return count.get();
         } catch (InterruptedException e) {
             e.printStackTrace();
             return -1;
@@ -239,34 +254,26 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     @Override
     public Iterable<K> loadAllKeys() {
-        BlockingQueue<Integer> countQueue = new LinkedBlockingQueue<>(1);
-        BlockingQueue<JsonObject> resultsQueue = new LinkedBlockingQueue<>();
+        AtomicInteger count = new AtomicInteger(-1);
+        List<JsonObject> allResults = new LinkedList<>();
+        CountDownLatch findLatch = new CountDownLatch(1);
         client.find(getKeysCollectionName(), new JsonObject(), res -> {
             if (res.succeeded()) {
                 List<JsonObject> results = res.result();
                 results.forEach(this::processKeyAfterRetrieving);
-                countQueue.offer(results.size());
-                resultsQueue.addAll(results);
+                count.set(results.size());
+                allResults.addAll(results);
             }
+            findLatch.countDown();
         });
         try {
-            Integer count = countQueue.poll(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
-            if (count == null) {
+            findLatch.await(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+            if (count.get() == -1) {
                 //failed
                 return null;
             }
-            if (count == 0) {
+            if (count.get() == 0) {
                 return new LinkedList<>();
-            }
-            List<JsonObject> allResults = new LinkedList<>();
-            JsonObject firstResult = resultsQueue.poll(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
-            allResults.add(firstResult);
-            long currentTime = System.currentTimeMillis();
-            while (allResults.size() < count) {
-                resultsQueue.drainTo(allResults);
-                if (System.currentTimeMillis() - currentTime > POLL_TIMEOUT) {
-                    break;
-                }
             }
             return allResults.stream().map(x -> SerializationHelper.readObjectFromJson(x, getStoredKeyClass())).collect(Collectors.toList());
         } catch (InterruptedException e) {
@@ -277,10 +284,16 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     @Override
     public void deleteAll() {
-        client.dropCollection(getKeysCollectionName(), res -> {
-        });
-        client.dropCollection(getValuesCollectionName(), res -> {
-        });
+        CountDownLatch latch = new CountDownLatch(2);
+        client.dropCollection(getKeysCollectionName(), res -> latch.countDown());
+        client.dropCollection(getValuesCollectionName(), res -> latch.countDown());
+        //this is quite ugly but we want to ensure that the call blocks until all collections were dropped
+        try {
+            latch.await(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
     }
 
 
