@@ -97,4 +97,7 @@ public class DBInfo {
         this.password = password;
     }
 
+    public void appendDBNameEnvironment(String s) {
+        setDbName(getDbName() + s);
+    }
 }
