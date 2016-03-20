@@ -1,7 +1,5 @@
 package io.distmap.persistent.vertx;
 
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.util.IterableUtil;
 import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
 import io.distmap.persistent.AbstractMapStore;
@@ -227,11 +225,11 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     public Set<Map.Entry<K, V>> getEntrySet() {
         Iterable<K> keys = loadAllKeys();
-        if(keys==null){
+        if (keys == null) {
             return null;
         }
         Set<Map.Entry<K, V>> entries = new HashSet<>();
-        for(K key : keys){
+        for (K key : keys) {
             Map.Entry<K, V> entry = new AbstractMap.SimpleEntry<>(key, load(key));
             entries.add(entry);
         }
@@ -278,9 +276,11 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     }
 
     @Override
-    public void deleteAll(){
-        client.dropCollection(getKeysCollectionName(), res -> {});
-        client.dropCollection(getValuesCollectionName(), res -> {});
+    public void deleteAll() {
+        client.dropCollection(getKeysCollectionName(), res -> {
+        });
+        client.dropCollection(getValuesCollectionName(), res -> {
+        });
     }
 
 
@@ -292,7 +292,7 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
         } catch (IllegalAccessException | InterruptedException e) {
             e.printStackTrace();
         }
-        return keyId!=null;
+        return keyId != null;
     }
 
 
