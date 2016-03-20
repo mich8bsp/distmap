@@ -25,12 +25,12 @@ public class MapStoreProxy {
 
             @Override
             public boolean containsKey(Object key) {
-                return mapStore.load((K) key) != null;
+                return mapStore.containsKey((K) key);
             }
 
             @Override
             public boolean containsValue(Object value) {
-                return values().contains(value);
+                return mapStore.containsValue(value);
             }
 
             @Override
@@ -58,7 +58,7 @@ public class MapStoreProxy {
 
             @Override
             public void clear() {
-                mapStore.deleteAll(keySet());
+                mapStore.deleteAll();
             }
 
             @Override
@@ -70,8 +70,7 @@ public class MapStoreProxy {
 
             @Override
             public Collection<V> values() {
-                Set<Entry<K, V>> entries = entrySet();
-                return entries.stream().map(Entry::getValue).collect(Collectors.toList());
+                return mapStore.loadAllValues();
             }
 
             @Override

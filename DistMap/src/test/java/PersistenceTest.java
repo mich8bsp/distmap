@@ -41,7 +41,7 @@ public class PersistenceTest {
     }
 
 
-    @Ignore
+   // @Ignore
     @Test
     public void persistenceTest() throws InterruptedException {
         int domain = 34;
