@@ -38,7 +38,7 @@ public class PersistenceTest {
                 return TestType.class;
             }
         };
-        dbInfo = new DBInfo("test-db", Collections.singletonList("localhost"), "guest", "guest");
+        dbInfo = new DBInfo("test-db", Collections.singletonList("ds013579.mlab.com:13579"), "guest", "guest");
     }
 
     @Before
@@ -163,7 +163,7 @@ public class PersistenceTest {
     }
 
     private static List<TestType> getRandomItems() {
-        int count = (int) (Math.random() * 1000 + 1);
+        int count = (int) (Math.random() * 200 + 1);
         List<TestType> items = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             TestType item = new TestType();

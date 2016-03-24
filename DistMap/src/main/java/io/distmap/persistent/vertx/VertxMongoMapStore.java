@@ -1,7 +1,5 @@
 package io.distmap.persistent.vertx;
 
-import com.mongodb.DBObject;
-import com.mongodb.QueryBuilder;
 import io.distmap.persistent.AbstractMapStore;
 import io.distmap.persistent.DBInfo;
 import io.vertx.core.json.JsonObject;
@@ -40,8 +38,15 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     protected static JsonObject getConfig(DBInfo dbInfo) {
         JsonObject config = new JsonObject();
-        config.put("host", dbInfo.getDbHosts().get(0));
-        config.put("port", DEFAULT_MONGO_PORT);
+        String dbHost = dbInfo.getDbHosts().get(0);
+        int port = DEFAULT_MONGO_PORT;
+        if (dbHost.contains(":")) {
+            String[] splitDbName = dbHost.split(":");
+            dbHost = splitDbName[0];
+            port = Integer.parseInt(splitDbName[1]);
+        }
+        config.put("host", dbHost);
+        config.put("port", port);
         config.put("username", dbInfo.getUserName());
         config.put("password", dbInfo.getPassword());
         config.put("db_name", dbInfo.getDbName());
@@ -67,12 +72,20 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
             jsonValue.put(TIMESTAMP, System.currentTimeMillis());
             jsonValue.put(KEY_ID, keyId);
             CountDownLatch latch = new CountDownLatch(1);
-            client.save(getValuesCollectionName(), jsonValue, res -> {
-                if (res.succeeded()) {
-                    ensureMaxSamplesPerInstance(keyId, LIMIT);
-                }
-                latch.countDown();
-            });
+            if (LIMIT > 0) {
+                client.find(getValuesCollectionName(), buildKeyIdQuery(keyId), res -> {
+                    if (res.succeeded()) {
+                        List<JsonObject> results = res.result();
+                        if (results.size() >= LIMIT) {
+                            results.sort(sorter);
+                            JsonObject toReplace = results.get(0);
+                            client.replace(getValuesCollectionName(), toReplace, jsonValue, replaceRes -> latch.countDown());
+                        } else {
+                            client.save(getValuesCollectionName(), jsonValue, saveRes -> latch.countDown());
+                        }
+                    }
+                });
+            }
             if (!async) {
                 latch.await(POLL_TIMEOUT, TimeUnit.MILLISECONDS);
             }
@@ -112,26 +125,6 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
             return null;
         }
         return keyIdList.get(0);
-    }
-
-    private void ensureMaxSamplesPerInstance(String keyId, int limit) {
-        requireNonNull(client, "Mongo client cannot be null");
-        JsonObject keyQuery = buildKeyIdQuery(keyId);
-        client.find(getValuesCollectionName(), keyQuery, res -> {
-            if (res.succeeded()) {
-                List<JsonObject> historicalValues = res.result();
-                historicalValues.sort(sorter);
-                if (historicalValues.size() > limit && limit > 0) {
-                    long lastRelevantTime = historicalValues.get(historicalValues.size() - limit + 1).getLong(TIMESTAMP);
-                    DBObject builder = QueryBuilder.start().put(TIMESTAMP).lessThan(lastRelevantTime).get();
-                    JsonObject removeQuery = new JsonObject(builder.toMap());
-                    removeQuery.mergeIn(keyQuery);
-                    client.remove(getValuesCollectionName(), removeQuery, removeRes -> {
-
-                    });
-                }
-            }
-        });
     }
 
     private JsonObject buildKeyIdQuery(String keyId) {
