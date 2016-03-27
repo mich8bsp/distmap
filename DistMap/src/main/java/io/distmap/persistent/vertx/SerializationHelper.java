@@ -21,7 +21,7 @@ public class SerializationHelper {
         }
     }
 
-    public static <ReturnedObject> ReturnedObject readObjectFromJson(JsonObject json, Class<ReturnedObject> returnedObjectClass) {
+    public static <ReturnedObject> ReturnedObject readObjectFromJson(JsonObject json, Class<? extends ReturnedObject> returnedObjectClass) {
         ObjectMapper mapper = new ObjectMapper();
         try {
             return mapper.readValue(json.encode(), returnedObjectClass);

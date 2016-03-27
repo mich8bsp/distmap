@@ -5,10 +5,7 @@ import io.distmap.persistent.AbstractMapStore;
 import io.distmap.persistent.DBInfo;
 import io.distmap.persistent.PersistentDistributedMap;
 import io.distmap.persistent.vertx.VertxMongoMapStore;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -29,16 +26,17 @@ public class PersistenceTest {
     public static void beforeInit() {
         mapStore = new VertxMongoMapStore<TestType, TestType>() {
             @Override
-            public Class<TestType> getStoredValueClass() {
-                return TestType.class;
+            public Class<? extends TestType> getStoredValueClass() {
+                return ComplexTestType.class;
             }
 
             @Override
-            public Class<TestType> getStoredKeyClass() {
-                return TestType.class;
+            public Class<? extends TestType> getStoredKeyClass() {
+                return ComplexTestType.class;
             }
         };
-        dbInfo = new DBInfo("test-db", Collections.singletonList("ds013579.mlab.com:13579"), "guest", "guest");
+//        dbInfo = new DBInfo("test-db", Collections.singletonList("ds013579.mlab.com:13579"), "guest", "guest");
+        dbInfo = new DBInfo("test-db", Collections.singletonList("localhost"), "guest", "guest");
     }
 
     @Before
@@ -61,7 +59,7 @@ public class PersistenceTest {
                 result = event.getValue();
             }
         }).build();
-        TestType item = new TestType();
+        TestType item = new ComplexTestType();
         item.setId(234);
         item.setName("test-name");
         map1.put(item, item);
@@ -86,11 +84,11 @@ public class PersistenceTest {
     public void testDirectToDB() throws InterruptedException {
         int domain = 35;
         Map<TestType, TestType> mapDirect = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
-        TestType item = new TestType();
+        TestType item = new ComplexTestType();
         item.setId(2341);
         item.setName("test-name");
         mapDirect.put(item, item);
-        TestType item2 = new TestType();
+        TestType item2 = new ComplexTestType();
         item2.setId(2341);
         item2.setName("test");
         result = mapDirect.get(item2);
@@ -154,19 +152,20 @@ public class PersistenceTest {
     }
 
     private TestType cleanKey(TestType item) {
-        TestType key = new TestType();
+        TestType key = new ComplexTestType();
         key.setId(item.getId());
         key.setName("dsasd");
         key.setListSomething(Arrays.asList(3, 4, 5, 2, 4, 6, 2));
         key.setSomething(new String[]{"fkgklsdl"});
+        ((ComplexTestType)key).setSecondaryKey(((ComplexTestType)item).getSecondaryKey());
         return key;
     }
 
     private static List<TestType> getRandomItems() {
-        int count = (int) (Math.random() * 200 + 1);
+        int count = (int) (Math.random() * 2000 + 1);
         List<TestType> items = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            TestType item = new TestType();
+            TestType item = new ComplexTestType();
             item.setId(i + 1);
             item.setName(UUID.randomUUID().toString());
             int listSize = Math.abs(new Random().nextInt(100)) + 1;
@@ -177,6 +176,8 @@ public class PersistenceTest {
                 smth[j] = UUID.randomUUID().toString();
             }
             item.setSomething(smth);
+            ((ComplexTestType)item).setSomeBoolean(false);
+            ((ComplexTestType)item).setSecondaryKey(i+2);
             items.add(item);
         }
         return items;
