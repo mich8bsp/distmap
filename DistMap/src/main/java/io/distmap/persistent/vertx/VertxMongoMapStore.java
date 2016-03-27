@@ -10,6 +10,7 @@ import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -17,7 +18,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Created by mich8bsp on 19-Mar-16.
  */
-public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
+public class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     //FIXME: make this configurable (2 is a sane default)
     private static final int LIMIT = 2;
@@ -29,6 +30,10 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
     private MongoClient client;
 
     private static Comparator<JsonObject> sorter = (o1, o2) -> (int) (o1.getLong(TIMESTAMP) - o2.getLong(TIMESTAMP));
+
+    public VertxMongoMapStore(Map.Entry<Class<? extends K>, Class<? extends V>> typesEntry) {
+        this.typesEntry = typesEntry;
+    }
 
     @Override
     public void connectToDB(DBInfo dbInfo) {
@@ -149,7 +154,7 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
 
     public List<Field> getKeyFields() {
         List<Field> keyFields = new LinkedList<>();
-        for (Field field : getStoredKeyClass().getDeclaredFields()) {
+        for (Field field : typesEntry.getKey().getDeclaredFields()) {
             if (field.isAnnotationPresent(Key.class)) {
                 keyFields.add(field);
             }
@@ -193,7 +198,7 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
             if (receivedResult.size() > 0) {
                 JsonObject result = receivedResult.get(0);
                 if (result != null) {
-                    return SerializationHelper.readObjectFromJson(result, getStoredValueClass());
+                    return SerializationHelper.readObjectFromJson(result, typesEntry.getValue());
                 }
             }
         } catch (IllegalAccessException | InterruptedException e) {
@@ -268,7 +273,7 @@ public abstract class VertxMongoMapStore<K, V> extends AbstractMapStore<K, V> {
             if (count.get() == 0) {
                 return new LinkedList<>();
             }
-            return allResults.stream().map(x -> SerializationHelper.readObjectFromJson(x, getStoredKeyClass())).collect(Collectors.toList());
+            return allResults.stream().map(x -> SerializationHelper.readObjectFromJson(x, typesEntry.getKey())).collect(Collectors.toList());
         } catch (InterruptedException e) {
             e.printStackTrace();
             return null;

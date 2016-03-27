@@ -19,6 +19,7 @@ public abstract class AbstractMapStore<K, V> implements MapStore<K, V>, MapLoade
 
     private static final String KEYS_COLLECTION_SUFFIX = "_keys";
     private static final String VALUES_COLLECTION_SUFFIX = "_values";
+    public Map.Entry<Class<? extends K>, Class<? extends V>> typesEntry;
 
     @Override
     public void init(HazelcastInstance hazelcastInstance, Properties properties, String mapName) {
@@ -26,11 +27,6 @@ public abstract class AbstractMapStore<K, V> implements MapStore<K, V>, MapLoade
         DBInfo dbInfo = DBInfo.getDBInfo(properties);
         connectToDB(dbInfo);
     }
-
-    public abstract Class<? extends V> getStoredValueClass();
-
-    public abstract Class<? extends K> getStoredKeyClass();
-
 
     public abstract void connectToDB(DBInfo dbInfo);
 

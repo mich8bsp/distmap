@@ -1,11 +1,14 @@
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.IMap;
+import io.distmap.DistMap;
 import io.distmap.MapCallback;
 import io.distmap.persistent.AbstractMapStore;
 import io.distmap.persistent.DBInfo;
-import io.distmap.persistent.PersistentDistributedMap;
 import io.distmap.persistent.vertx.VertxMongoMapStore;
-import org.junit.*;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,25 +27,15 @@ public class PersistenceTest {
 
     @BeforeClass
     public static void beforeInit() {
-        mapStore = new VertxMongoMapStore<TestType, TestType>() {
-            @Override
-            public Class<? extends TestType> getStoredValueClass() {
-                return ComplexTestType.class;
-            }
-
-            @Override
-            public Class<? extends TestType> getStoredKeyClass() {
-                return ComplexTestType.class;
-            }
-        };
+        mapStore = new VertxMongoMapStore<>(new AbstractMap.SimpleEntry<>(ComplexTestType.class, ComplexTestType.class));
 //        dbInfo = new DBInfo("test-db", Collections.singletonList("ds013579.mlab.com:13579"), "guest", "guest");
         dbInfo = new DBInfo("test-db", Collections.singletonList("localhost"), "guest", "guest");
     }
 
     @Before
     public void cleanup() {
-        Map<TestType, TestType> map1 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, 34, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
-        Map<TestType, TestType> map2 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, 35, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map1 = DistMap.persistentMapBuilder(TEST_MAP, 34, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map2 = DistMap.persistentMapBuilder(TEST_MAP, 35, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
 
         map1.clear();
         map2.clear();
@@ -52,8 +45,8 @@ public class PersistenceTest {
     @Test
     public void persistenceTest() throws InterruptedException {
         int domain = 34;
-        Map<TestType, TestType> map1 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
-        Map<TestType, TestType> map2 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<TestType, TestType>() {
+        Map<TestType, TestType> map1 = DistMap.persistentMapBuilder(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map2 = DistMap.persistentMapBuilder(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<TestType, TestType>() {
             @Override
             public void entryAdded(EntryEvent<TestType, TestType> event) {
                 result = event.getValue();
@@ -72,7 +65,7 @@ public class PersistenceTest {
         ((IMap) map1).destroy();
         ((IMap) map2).destroy();
 
-        Map<TestType, TestType> map3 = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> map3 = DistMap.persistentMapBuilder(TEST_MAP, domain, mapStore, dbInfo).setPartition(DEFAULT_PARTITION).build();
         Thread.sleep(1000);
         TestType fromDB = map3.get(item);
         Assert.assertNotNull(fromDB);
@@ -83,7 +76,7 @@ public class PersistenceTest {
     @Test
     public void testDirectToDB() throws InterruptedException {
         int domain = 35;
-        Map<TestType, TestType> mapDirect = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> mapDirect = DistMap.persistentMapBuilder(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
         TestType item = new ComplexTestType();
         item.setId(2341);
         item.setName("test-name");
@@ -107,7 +100,7 @@ public class PersistenceTest {
     @Test
     public void testEmpty() {
         int domain = 35;
-        Map<TestType, TestType> mapDirect = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> mapDirect = DistMap.persistentMapBuilder(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
         mapDirect.clear();
         TestType item2 = new TestType();
         item2.setId(2343);
@@ -128,7 +121,7 @@ public class PersistenceTest {
     public void testMassiveRandom() {
         List<TestType> items = getRandomItems();
         int domain = 35;
-        Map<TestType, TestType> mapDirect = new PersistentDistributedMap.PersistentMapBuilder<>(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
+        Map<TestType, TestType> mapDirect = DistMap.persistentMapBuilder(TEST_MAP, domain, mapStore, dbInfo).setDirectToDB(true).setPartition(DEFAULT_PARTITION).build();
         items.forEach(item -> {
             for (int i = 0; i < 5; i++) {
                 mapDirect.put(cleanKey(item), item);

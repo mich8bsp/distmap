@@ -1,5 +1,6 @@
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.IMap;
+import io.distmap.DistMap;
 import io.distmap.DistributedMap;
 import io.distmap.MapCallback;
 import org.junit.Assert;
@@ -25,7 +26,7 @@ public class SimpleCommunicationTest {
 
     @BeforeClass
     public static void before() throws InterruptedException {
-        map = new DistributedMap.MapBuilder<String, String>(TEST_MAP,domain1).setPartition(DEFAULT_PARTITION).build();
+        map = DistMap.<String, String>mapBuilder(TEST_MAP,domain1).setPartition(DEFAULT_PARTITION).build();
         Thread.sleep(1000);
     }
 
@@ -33,7 +34,7 @@ public class SimpleCommunicationTest {
     public void testSendReceive() throws InterruptedException {
         System.out.println("Putting at time " + System.currentTimeMillis());
         map.put("test", "dfs");
-        Map<String, String> map2 = new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition("bbb").build();
+        Map<String, String> map2 = DistMap.<String, String>mapBuilder(TEST_MAP, domain1).setPartition("bbb").build();
         Thread.sleep(5000);
         System.out.println("Putting at time " + System.currentTimeMillis());
         map.put("test", "dfs");
@@ -54,7 +55,7 @@ public class SimpleCommunicationTest {
         String key = "test";
         String oldValue = "dfs";
         map.put(key, oldValue);
-        new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
+        DistMap.<String, String>mapBuilder(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
 
             @Override
             public void entryUpdated(EntryEvent<String, String> event) {
@@ -78,7 +79,7 @@ public class SimpleCommunicationTest {
         String key = "test";
         String oldValue = "dfs";
         map.put(key, oldValue);
-        new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
+        DistMap.<String, String>mapBuilder(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<String, String>() {
 
             @Override
             public void entryUpdated(EntryEvent<String, String> event) {
@@ -104,8 +105,8 @@ public class SimpleCommunicationTest {
     @Test
     public void testDomainSeparation(){
         int domain2 = 2;
-        Map<String, String> map2 = new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain2).setPartition(DEFAULT_PARTITION).build();
-        Map<String, String> map3 = new DistributedMap.MapBuilder<String, String>(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).build();
+        Map<String, String> map2 = DistMap.<String, String>mapBuilder(TEST_MAP, domain2).setPartition(DEFAULT_PARTITION).build();
+        Map<String, String> map3 = DistMap.<String, String>mapBuilder(TEST_MAP, domain1).setPartition(DEFAULT_PARTITION).build();
         String key = "key";
         String value = "dsfd";
         map.put(key, value);
