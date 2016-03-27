@@ -120,7 +120,7 @@ public class SimpleCommunicationTest {
 
     @Test
     public void testType() throws InterruptedException {
-        int domain = 34;
+        int domain = 11;
         Map<TestType, TestType> map1 = new DistributedMap.MapBuilder<TestType, TestType>(TEST_MAP, domain).setPartition(DEFAULT_PARTITION).build();
         Map<TestType, TestType> map2 = new DistributedMap.MapBuilder<TestType, TestType>(TEST_MAP, domain).setPartition(DEFAULT_PARTITION).setListener(new MapCallback<TestType, TestType>(){
             @Override
