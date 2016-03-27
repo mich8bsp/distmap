@@ -27,9 +27,9 @@ public abstract class AbstractMapStore<K, V> implements MapStore<K, V>, MapLoade
         connectToDB(dbInfo);
     }
 
-    public abstract Class<V> getStoredValueClass();
+    public abstract Class<? extends V> getStoredValueClass();
 
-    public abstract Class<K> getStoredKeyClass();
+    public abstract Class<? extends K> getStoredKeyClass();
 
 
     public abstract void connectToDB(DBInfo dbInfo);
